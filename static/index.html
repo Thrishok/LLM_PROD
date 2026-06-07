@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM_PROD Chat</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-title">
+        <span class="dot"></span>
+        <h1>LLM_PROD Chat</h1>
+      </div>
+      <button id="reset-btn" class="reset-btn" title="Start a new conversation">New chat</button>
+    </header>
+
+    <main id="messages" class="messages">
+      <div class="message assistant">
+        <div class="bubble">Hi! I'm a LangGraph assistant with web search. Ask me anything.</div>
+      </div>
+    </main>
+
+    <form id="chat-form" class="composer">
+      <textarea
+        id="input"
+        class="input"
+        placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+        rows="1"
+        autocomplete="off"
+      ></textarea>
+      <button id="send-btn" type="submit" class="send-btn">Send</button>
+    </form>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+</html>
