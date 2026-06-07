@@ -3,7 +3,9 @@ langchain-core
 langgraph
 duckduckgo-search
 python-dotenv
-transformers  
+transformers
 torch
 ipython
 ddgs
+fastapi
+uvicorn[standard]
