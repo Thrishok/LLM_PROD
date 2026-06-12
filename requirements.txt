@@ -9,3 +9,4 @@ ipython
 ddgs
 fastapi
 uvicorn[standard]
+http://127.0.0.1:8000
