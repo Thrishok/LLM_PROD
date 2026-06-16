@@ -212,6 +212,11 @@ def login_page(request: Request):
     return FileResponse(os.path.join(static_dir, "login.html"))
 
 
+@app.get("/terms")
+def terms_page():
+    return FileResponse(os.path.join(static_dir, "terms.html"))
+
+
 app.mount("/", StaticFiles(directory=static_dir), name="static")
 
 
