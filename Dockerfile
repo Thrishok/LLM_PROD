@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code.
 COPY main.py .
+COPY auth.py .
+COPY db.py .
 COPY static/ ./static/
 
 EXPOSE 8000

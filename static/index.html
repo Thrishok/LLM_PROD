@@ -11,9 +11,16 @@
     <header class="header">
       <div class="header-title">
         <span class="dot"></span>
-        <h1>LLM_PROD Chat</h1>
+        <h1>APEX</h1>
       </div>
-      <button id="reset-btn" class="reset-btn" title="Start a new conversation">New chat</button>
+      <div class="header-actions">
+        <div id="user-badge" class="user-badge" hidden>
+          <img id="user-avatar" class="user-avatar" alt="" />
+          <span id="user-name" class="user-name"></span>
+        </div>
+        <button id="reset-btn" class="reset-btn" title="Start a new conversation">New chat</button>
+        <a href="/auth/logout" class="reset-btn" title="Sign out">Sign out</a>
+      </div>
     </header>
 
     <main id="messages" class="messages">

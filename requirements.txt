@@ -10,3 +10,10 @@ ddgs
 fastapi
 uvicorn[standard]
 
+# Auth + storage
+authlib
+itsdangerous
+httpx
+sqlmodel
+psycopg2-binary
+bcrypt

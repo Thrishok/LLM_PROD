@@ -7,6 +7,31 @@ const resetBtn = document.getElementById("reset-btn");
 // Persist the session id so refreshing the page keeps the conversation.
 let sessionId = localStorage.getItem("session_id") || null;
 
+// Load the signed-in user's profile into the header badge. A 401 means the
+// session expired, so bounce to the login page.
+async function loadUser() {
+  try {
+    const res = await fetch("/api/me");
+    if (res.status === 401) {
+      location.href = "/login";
+      return;
+    }
+    if (!res.ok) return;
+    const user = await res.json();
+    const badge = document.getElementById("user-badge");
+    const avatar = document.getElementById("user-avatar");
+    const nameEl = document.getElementById("user-name");
+    if (user.picture) avatar.src = user.picture;
+    else avatar.style.display = "none";
+    nameEl.textContent = user.name || user.email;
+    badge.hidden = false;
+  } catch (_) {
+    /* non-fatal: badge just stays hidden */
+  }
+}
+
+loadUser();
+
 function addMessage(text, role) {
   const wrap = document.createElement("div");
   wrap.className = `message ${role}`;
@@ -50,6 +75,11 @@ async function sendMessage(text) {
     });
 
     typing.remove();
+
+    if (res.status === 401) {
+      location.href = "/login";
+      return;
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
