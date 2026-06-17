@@ -6,16 +6,37 @@
 }
 
 .login-body {
+  position: relative;
   height: auto;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  overflow-y: auto;
+  overflow: hidden;
   background:
-    radial-gradient(900px 500px at 50% -10%, rgba(99, 102, 241, 0.18), transparent 60%),
+    radial-gradient(680px 480px at 28% 18%, rgba(139, 92, 246, 0.42), transparent 60%),
+    radial-gradient(720px 520px at 78% 30%, rgba(99, 102, 241, 0.40), transparent 62%),
+    radial-gradient(620px 600px at 50% 108%, rgba(124, 58, 237, 0.32), transparent 60%),
     var(--bg);
+}
+
+/* Soft, curvy glow that sits directly behind the card for extra depth. */
+.login-body::before {
+  content: "";
+  position: absolute;
+  width: 560px;
+  height: 560px;
+  border-radius: 46% 54% 60% 40% / 52% 44% 56% 48%;
+  background: radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.55), transparent 65%);
+  filter: blur(70px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
 }
 
 .login-card {
