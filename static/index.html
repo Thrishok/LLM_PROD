@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LLM_PROD Chat</title>
+  <title>APEX- AI Assistant</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,14 +11,21 @@
     <header class="header">
       <div class="header-title">
         <span class="dot"></span>
-        <h1>LLM_PROD Chat</h1>
+        <h1>APEX</h1>
       </div>
-      <button id="reset-btn" class="reset-btn" title="Start a new conversation">New chat</button>
+      <div class="header-actions">
+        <div id="user-badge" class="user-badge" hidden>
+          <img id="user-avatar" class="user-avatar" alt="" hidden />
+          <span id="user-initials" class="user-avatar user-initials" hidden></span>
+        </div>
+        <button id="reset-btn" class="reset-btn" title="Start a new conversation">New chat</button>
+        <a href="/auth/logout" class="reset-btn signout-btn" title="Sign out">Sign out</a>
+      </div>
     </header>
 
     <main id="messages" class="messages">
       <div class="message assistant">
-        <div class="bubble">Hi! I'm a LangGraph assistant with web search. Ask me anything.</div>
+        <div class="bubble">Hi! I'm a AI assistant with web search. Ask me anything.</div>
       </div>
     </main>
 

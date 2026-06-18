@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · LLM_PROD Chat</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/login.css" />
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <div class="login-logo">
+      <span class="dot"></span>
+    </div>
+
+    <h1 class="login-title">Welcome to <span class="brand">APEX</span></h1>
+    <p id="subtitle" class="login-subtitle">Sign in to start chatting with your AI assistant.</p>
+
+    <div id="error" class="login-error" hidden></div>
+
+    <!-- Email / password form -->
+    <form id="auth-form" class="auth-form" autocomplete="on">
+      <div id="name-field" class="field" hidden>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" placeholder="Your name" autocomplete="name" />
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="you@example.com"
+               autocomplete="email" required />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="••••••••"
+               autocomplete="current-password" required minlength="8" />
+      </div>
+
+      <button id="submit-btn" type="submit" class="primary-btn">Sign in</button>
+    </form>
+
+    <p class="toggle-line">
+      <span id="toggle-text">Don't have an account?</span>
+      <a id="toggle-link" href="#" class="toggle-link">Create one</a>
+    </p>
+
+    <div class="divider"><span>or</span></div>
+
+    <a href="/auth/login" class="google-btn">
+      <svg class="google-icon" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35.5 24 35.5c-6.4 0-11.6-5.2-11.6-11.5S17.6 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.6 6.5 29.1 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.6 19 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.6 6.5 29.1 4.5 24 4.5 16.3 4.5 9.7 8.9 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 43.5c5.2 0 9.6-2 12.9-5.2l-6-5.1c-2 1.5-4.5 2.3-6.9 2.3-5.3 0-9.7-3.1-11.3-7.6l-6.5 5C9.6 39 16.2 43.5 24 43.5z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4-4.1 5.2l6 5.1c-.4.4 6.3-4.6 6.3-14.3 0-1.2-.1-2.4-.4-3.5z"/>
+      </svg>
+      <span>Continue with Google</span>
+    </a>
+
+    <p class="login-footer">By continuing you agree to our <a href="/terms" target="_blank" rel="noopener" class="footer-link">terms of use</a>.</p>
+  </main>
+
+  <script src="/login.js"></script>
+</body>
+</html>

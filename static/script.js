@@ -7,6 +7,54 @@ const resetBtn = document.getElementById("reset-btn");
 // Persist the session id so refreshing the page keeps the conversation.
 let sessionId = localStorage.getItem("session_id") || null;
 
+// Build initials from a name ("Sourav Pal" -> "SP") or fall back to the email.
+function initialsFor(name, email) {
+  const n = (name || "").trim();
+  if (n) {
+    const parts = n.split(/\s+/);
+    if (parts.length >= 2) return parts[0][0] + parts[1][0];
+    return n.slice(0, 2);
+  }
+  return (email || "?").slice(0, 2);
+}
+
+// Load the signed-in user's profile into the header avatar. A 401 means the
+// session expired, so bounce to the login page.
+async function loadUser() {
+  try {
+    const res = await fetch("/api/me");
+    if (res.status === 401) {
+      location.href = "/login";
+      return;
+    }
+    if (!res.ok) return;
+    const user = await res.json();
+    const badge = document.getElementById("user-badge");
+    const avatar = document.getElementById("user-avatar");
+    const initialsEl = document.getElementById("user-initials");
+    const label = user.name || user.email;
+    badge.title = label; // hover shows the full name/email
+
+    if (user.picture) {
+      // Google users: show their profile photo.
+      avatar.src = user.picture;
+      avatar.alt = label;
+      avatar.hidden = false;
+      initialsEl.hidden = true;
+    } else {
+      // Email/password users: show an initials avatar.
+      initialsEl.textContent = initialsFor(user.name, user.email);
+      initialsEl.hidden = false;
+      avatar.hidden = true;
+    }
+    badge.hidden = false;
+  } catch (_) {
+    /* non-fatal: badge just stays hidden */
+  }
+}
+
+loadUser();
+
 function addMessage(text, role) {
   const wrap = document.createElement("div");
   wrap.className = `message ${role}`;
@@ -50,6 +98,11 @@ async function sendMessage(text) {
     });
 
     typing.remove();
+
+    if (res.status === 401) {
+      location.href = "/login";
+      return;
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

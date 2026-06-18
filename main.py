@@ -11,10 +11,15 @@ from typing import Annotated, Dict, List
 from typing_extensions import TypedDict
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel, Field
+
+import auth
+from auth import current_user
+from db import init_db
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
@@ -94,6 +99,23 @@ graph = build_graph()
 
 app = FastAPI(title="LLM_PROD Chat", description="LangGraph + Groq chatbot")
 
+# Signed-cookie sessions (required by Authlib's OAuth flow and used to keep
+# users logged in). SESSION_SECRET must be a long random string in production.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "dev-only-insecure-change-me"),
+    https_only=os.getenv("COOKIE_SECURE", "").lower() == "true",
+    same_site="lax",
+)
+
+# Auth routes: /auth/login, /auth/callback, /auth/logout
+app.include_router(auth.router)
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
+
 # In-memory conversation history keyed by session id. Fine for a single-process
 # demo; swap for a real store (Redis, DB) before scaling out.
 sessions: Dict[str, List[BaseMessage]] = {}
@@ -112,7 +134,7 @@ class ChatResponse(BaseModel):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, user: dict = Depends(current_user)):
     if not os.getenv("GROQ_API_KEY"):
         raise HTTPException(
             status_code=500,
@@ -153,10 +175,16 @@ def chat(req: ChatRequest):
 
 
 @app.delete("/api/session/{session_id}")
-def reset_session(session_id: str):
+def reset_session(session_id: str, user: dict = Depends(current_user)):
     """Clear a conversation's history."""
     sessions.pop(session_id, None)
     return {"status": "cleared", "session_id": session_id}
+
+
+@app.get("/api/me")
+def me(user: dict = Depends(current_user)):
+    """Return the logged-in user's profile for the frontend."""
+    return user
 
 
 @app.get("/api/health")
@@ -169,8 +197,24 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 
 @app.get("/")
-def index():
+def index(request: Request):
+    # Gate the chat UI behind login: send anonymous visitors to the login page.
+    if not request.session.get("user"):
+        return RedirectResponse(url="/login")
     return FileResponse(os.path.join(static_dir, "index.html"))
+
+
+@app.get("/login")
+def login_page(request: Request):
+    # Already signed in? Skip the login screen.
+    if request.session.get("user"):
+        return RedirectResponse(url="/")
+    return FileResponse(os.path.join(static_dir, "login.html"))
+
+
+@app.get("/terms")
+def terms_page():
+    return FileResponse(os.path.join(static_dir, "terms.html"))
 
 
 app.mount("/", StaticFiles(directory=static_dir), name="static")
