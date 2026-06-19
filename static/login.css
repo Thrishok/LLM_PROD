@@ -177,6 +177,57 @@
   border-color: var(--accent);
 }
 
+/* Password show/hide toggle */
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.password-toggle:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+.password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Show the "eye" by default; swap to "eye-off" when the password is revealed. */
+.password-toggle .icon-eye-off {
+  display: none;
+}
+
+.password-toggle.revealed .icon-eye {
+  display: none;
+}
+
+.password-toggle.revealed .icon-eye-off {
+  display: block;
+}
+
 .primary-btn {
   margin-top: 2px;
   width: 100%;

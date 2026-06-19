@@ -8,7 +8,20 @@ const nameField = document.getElementById("name-field");
 const nameInput = document.getElementById("name");
 const passwordInput = document.getElementById("password");
 
+const togglePassword = document.getElementById("toggle-password");
+
 let mode = "login"; // "login" | "register"
+
+// Show / hide the password when the eye icon is clicked.
+togglePassword.addEventListener("click", () => {
+  const reveal = passwordInput.type === "password";
+  passwordInput.type = reveal ? "text" : "password";
+  togglePassword.classList.toggle("revealed", reveal);
+  const label = reveal ? "Hide password" : "Show password";
+  togglePassword.setAttribute("aria-label", label);
+  togglePassword.setAttribute("title", label);
+  passwordInput.focus();
+});
 
 function showError(msg) {
   errorBox.textContent = msg;
