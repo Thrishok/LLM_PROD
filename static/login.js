@@ -1,3 +1,8 @@
+// Apply the saved theme (shared with the chat page) before anything renders.
+if ((localStorage.getItem("zora-theme") || "dark") === "light") {
+  document.documentElement.setAttribute("data-theme", "light");
+}
+
 const form = document.getElementById("auth-form");
 const errorBox = document.getElementById("error");
 const submitBtn = document.getElementById("submit-btn");
@@ -7,7 +12,6 @@ const subtitle = document.getElementById("subtitle");
 const nameField = document.getElementById("name-field");
 const nameInput = document.getElementById("name");
 const passwordInput = document.getElementById("password");
-
 const togglePassword = document.getElementById("toggle-password");
 
 let mode = "login"; // "login" | "register"

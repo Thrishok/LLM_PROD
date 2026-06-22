@@ -5,8 +5,7 @@ DuckDuckGo web-search tool, exposed over an HTTP API plus a small web UI.
 """
 
 import os
-import uuid
-from typing import Annotated, Dict, List
+from typing import Annotated, List
 
 from typing_extensions import TypedDict
 
@@ -18,10 +17,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel, Field
 
 import auth
+import db
 from auth import current_user
 from db import init_db
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_groq import ChatGroq
 from langgraph.graph import START, StateGraph
@@ -116,21 +116,22 @@ app.include_router(auth.router)
 def _startup() -> None:
     init_db()
 
-# In-memory conversation history keyed by session id. Fine for a single-process
-# demo; swap for a real store (Redis, DB) before scaling out.
-sessions: Dict[str, List[BaseMessage]] = {}
-
-
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="User message")
-    session_id: str | None = Field(
-        None, description="Conversation id; omit to start a new conversation"
+    conversation_id: int | None = Field(
+        None, description="Conversation to continue; omit to start a new one"
     )
 
 
 class ChatResponse(BaseModel):
     response: str
-    session_id: str
+    conversation_id: int
+    title: str
+
+
+def _title_from(message: str) -> str:
+    t = message.strip().replace("\n", " ")
+    return t[:40] + "…" if len(t) > 40 else t
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -141,44 +142,72 @@ def chat(req: ChatRequest, user: dict = Depends(current_user)):
             detail="GROQ_API_KEY is not set. Add it to your .env file.",
         )
 
-    session_id = req.session_id or str(uuid.uuid4())
-    history = sessions.get(session_id, [])
+    # Resolve the conversation: continue an owned one, else start a new one.
+    conv_id = req.conversation_id
+    is_new = conv_id is None or not db.conversation_owner(conv_id, user["id"])
+    if is_new:
+        conv_id = db.create_conversation(user["id"])
+
+    # Rebuild the LLM context from stored history (restart-safe, per user).
+    history: List[BaseMessage] = []
+    for role, content in db.get_history(conv_id):
+        history.append(
+            HumanMessage(content=content) if role == "user" else AIMessage(content=content)
+        )
     history.append(HumanMessage(content=req.message))
 
     try:
         result = graph.invoke({"messages": history})
     except BadRequestError:
-        # Roll back the user message that triggered the failure.
-        history.pop()
-        sessions[session_id] = history
+        # Don't leave an empty conversation behind if the very first turn fails.
+        if is_new:
+            db.delete_conversation(conv_id, user["id"])
         raise HTTPException(
             status_code=400,
             detail="The assistant tried to use a capability that isn't available. "
             "Please rephrase your request.",
         )
     except Exception as e:
-        # Network/auth/upstream errors: roll back and surface a clean message
-        # instead of a bare 500 traceback.
-        history.pop()
-        sessions[session_id] = history
+        if is_new:
+            db.delete_conversation(conv_id, user["id"])
         raise HTTPException(
             status_code=502,
             detail=f"The language model request failed: {e}",
         )
 
-    # Persist the full message list returned by the graph (includes the new
-    # AI/tool messages) so the next turn has the complete context.
-    sessions[session_id] = result["messages"]
     answer = result["messages"][-1].content
 
-    return ChatResponse(response=answer, session_id=session_id)
+    # Persist the turn; name a brand-new conversation after its first message.
+    title = db.append_turn(
+        conv_id,
+        req.message,
+        answer,
+        _title_from(req.message) if is_new else None,
+    )
+
+    return ChatResponse(response=answer, conversation_id=conv_id, title=title)
 
 
-@app.delete("/api/session/{session_id}")
-def reset_session(session_id: str, user: dict = Depends(current_user)):
-    """Clear a conversation's history."""
-    sessions.pop(session_id, None)
-    return {"status": "cleared", "session_id": session_id}
+@app.get("/api/conversations")
+def list_conversations(user: dict = Depends(current_user)):
+    """All of the current user's conversations, newest first."""
+    return db.list_conversations(user["id"])
+
+
+@app.get("/api/conversations/{conv_id}")
+def get_conversation(conv_id: int, user: dict = Depends(current_user)):
+    """A single conversation with its full message history."""
+    data = db.get_conversation_owned(conv_id, user["id"])
+    if data is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return data
+
+
+@app.delete("/api/conversations/{conv_id}")
+def delete_conversation(conv_id: int, user: dict = Depends(current_user)):
+    if not db.delete_conversation(conv_id, user["id"]):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"ok": True}
 
 
 @app.get("/api/me")
@@ -197,10 +226,10 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 
 @app.get("/")
-def index(request: Request):
-    # Gate the chat UI behind login: send anonymous visitors to the login page.
-    if not request.session.get("user"):
-        return RedirectResponse(url="/login")
+def index():
+    # Everyone can view the chat UI. Sending a message still requires auth
+    # (the /api/chat endpoint enforces it), so anonymous users are prompted
+    # to log in only when they actually try to chat.
     return FileResponse(os.path.join(static_dir, "index.html"))
 
 
