@@ -111,6 +111,10 @@ if (err) {
       ? "Google sign-in was cancelled. Please try again."
       : err === "unverified"
       ? "Your Google email isn't verified."
+      : err === "invalid"
+      ? "Google sign-in failed: unable to verify your account."
+      : err === "server"
+      ? "Google sign-in failed due to a server error. Try again later."
       : "Something went wrong signing you in."
   );
 }
