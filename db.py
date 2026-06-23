@@ -78,15 +78,19 @@ def create_email_user(email: str, password_hash: str, name: str) -> User:
 def upsert_google_user(google_sub: str, email: str, name: str, picture: str) -> User:
     """Create or update a Google user, linking to an existing email account if present."""
     with Session(engine) as session:
-        user = session.exec(select(User).where(User.email == email)).first()
+        user = session.exec(select(User).where(User.google_sub == google_sub)).first()
+        if user is None:
+            user = session.exec(select(User).where(User.email == email)).first()
+
         if user is None:
             user = User(google_sub=google_sub, email=email, name=name, picture=picture)
             session.add(user)
         else:
-            # Link Google to an existing (possibly email/password) account.
             user.google_sub = google_sub
+            user.email = email
             user.name = name or user.name
             user.picture = picture or user.picture
+
         session.commit()
         session.refresh(user)
         return user
