@@ -56,12 +56,12 @@
   margin-bottom: 14px;
 }
 
-.login-logo .dot {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: linear-gradient(145deg, var(--accent), #8b5cf6);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
+.login-logo-img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 8px 20px rgba(99, 102, 241, 0.35));
 }
 
 .login-title {
@@ -175,6 +175,57 @@
 
 .field input:focus {
   border-color: var(--accent);
+}
+
+/* Password show/hide toggle */
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.password-toggle:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+.password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Show the "eye" by default; swap to "eye-off" when the password is revealed. */
+.password-toggle .icon-eye-off {
+  display: none;
+}
+
+.password-toggle.revealed .icon-eye {
+  display: none;
+}
+
+.password-toggle.revealed .icon-eye-off {
+  display: block;
 }
 
 .primary-btn {

@@ -90,3 +90,114 @@ def upsert_google_user(google_sub: str, email: str, name: str, picture: str) -> 
         session.commit()
         session.refresh(user)
         return user
+
+
+# --------------------------------------------------------------------------- #
+# Conversations + messages (persistent chat history, per user)
+# --------------------------------------------------------------------------- #
+
+
+class Conversation(SQLModel, table=True):
+    """A chat thread belonging to one user."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    title: str = "New chat"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class Message(SQLModel, table=True):
+    """A single message within a conversation ("user" or "assistant")."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    conversation_id: int = Field(index=True)
+    role: str  # "user" | "assistant"
+    content: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def create_conversation(user_id: int, title: str = "New chat") -> int:
+    with Session(engine) as session:
+        conv = Conversation(user_id=user_id, title=title)
+        session.add(conv)
+        session.commit()
+        session.refresh(conv)
+        return conv.id
+
+
+def conversation_owner(conv_id: int, user_id: int) -> bool:
+    with Session(engine) as session:
+        conv = session.get(Conversation, conv_id)
+        return bool(conv and conv.user_id == user_id)
+
+
+def list_conversations(user_id: int) -> list[dict]:
+    with Session(engine) as session:
+        rows = session.exec(
+            select(Conversation)
+            .where(Conversation.user_id == user_id)
+            .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
+        ).all()
+        return [
+            {"id": c.id, "title": c.title, "updated_at": c.updated_at.isoformat()}
+            for c in rows
+        ]
+
+
+def get_conversation_owned(conv_id: int, user_id: int) -> Optional[dict]:
+    with Session(engine) as session:
+        conv = session.get(Conversation, conv_id)
+        if not conv or conv.user_id != user_id:
+            return None
+        msgs = session.exec(
+            select(Message).where(Message.conversation_id == conv_id).order_by(Message.id)
+        ).all()
+        return {
+            "id": conv.id,
+            "title": conv.title,
+            "messages": [{"role": m.role, "content": m.content} for m in msgs],
+        }
+
+
+def get_history(conv_id: int) -> list[tuple]:
+    """Return (role, content) pairs in order, for rebuilding the LLM context."""
+    with Session(engine) as session:
+        msgs = session.exec(
+            select(Message).where(Message.conversation_id == conv_id).order_by(Message.id)
+        ).all()
+        return [(m.role, m.content) for m in msgs]
+
+
+def append_turn(conv_id: int, user_text: str, assistant_text: str, title: Optional[str]) -> str:
+    """Persist a user+assistant turn, bump updated_at, optionally set the title.
+
+    Returns the conversation's current title.
+    """
+    with Session(engine) as session:
+        session.add(Message(conversation_id=conv_id, role="user", content=user_text))
+        session.add(Message(conversation_id=conv_id, role="assistant", content=assistant_text))
+        conv = session.get(Conversation, conv_id)
+        if conv:
+            if title:
+                conv.title = title
+            conv.updated_at = datetime.now(timezone.utc)
+            current_title = conv.title
+        else:
+            current_title = title or "New chat"
+        session.commit()
+        return current_title
+
+
+def delete_conversation(conv_id: int, user_id: int) -> bool:
+    with Session(engine) as session:
+        conv = session.get(Conversation, conv_id)
+        if not conv or conv.user_id != user_id:
+            return False
+        for m in session.exec(
+            select(Message).where(Message.conversation_id == conv_id)
+        ).all():
+            session.delete(m)
+        session.delete(conv)
+        session.commit()
+        return True

@@ -3,44 +3,116 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>APEX- AI Assistant</title>
-  <link rel="stylesheet" href="/style.css" />
+  <title>ZORA- AI Assistant</title>
+  <link rel="stylesheet" href="/style.css?v=14" />
 </head>
 <body>
-  <div class="app">
-    <header class="header">
-      <div class="header-title">
-        <span class="dot"></span>
-        <h1>APEX</h1>
-      </div>
-      <div class="header-actions">
+  <div class="layout">
+    <!-- Chat history sidebar (logged-in users only) -->
+    <aside id="sidebar" class="sidebar" hidden>
+      <button id="new-chat-btn" class="new-chat-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        New chat
+      </button>
+      <div class="conv-list-label">Recent chats</div>
+      <div id="conv-list" class="conv-list"></div>
+
+      <!-- User + sign out, pinned to the bottom -->
+      <div class="sidebar-footer">
         <div id="user-badge" class="user-badge" hidden>
           <img id="user-avatar" class="user-avatar" alt="" hidden />
           <span id="user-initials" class="user-avatar user-initials" hidden></span>
+          <span id="user-name" class="user-name"></span>
         </div>
-        <button id="reset-btn" class="reset-btn" title="Start a new conversation">New chat</button>
-        <a href="/auth/logout" class="reset-btn signout-btn" title="Sign out">Sign out</a>
+        <a id="signout-link" href="/auth/logout" class="signout-icon-btn"
+           title="Sign out" aria-label="Sign out" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </a>
       </div>
-    </header>
+    </aside>
 
-    <main id="messages" class="messages">
-      <div class="message assistant">
-        <div class="bubble">Hi! I'm a AI assistant with web search. Ask me anything.</div>
-      </div>
-    </main>
+    <div class="app">
+      <header class="header">
+        <div class="header-title">
+          <button id="sidebar-toggle" class="icon-btn" type="button" aria-label="Toggle sidebar" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <a href="/" class="logo-home" title="Refresh ZORA">
+            <img src="/logo_icon.png?v=3" alt="" class="header-logo-img" />
+            <h1>ZORA</h1>
+          </a>
+        </div>
+        <div class="header-actions">
+          <div class="header-user-wrap">
+            <button id="header-user" class="header-user" type="button" aria-label="Account menu" hidden>
+              <img id="header-avatar" class="user-avatar" alt="" hidden />
+              <span id="header-initials" class="user-avatar user-initials" hidden></span>
+            </button>
+            <div id="user-menu" class="user-menu" hidden>
+              <div class="user-menu-head">
+                <div id="menu-name" class="user-menu-name"></div>
+                <div id="menu-email" class="user-menu-email"></div>
+              </div>
+              <button id="theme-toggle" class="user-menu-item theme-row" type="button"
+                      role="switch" aria-checked="false">
+                <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+                <span id="theme-label">Light mode</span>
+                <span class="switch"><span class="switch-knob"></span></span>
+              </button>
+              <a href="/auth/logout" class="user-menu-item user-menu-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sign out
+              </a>
+            </div>
+          </div>
+          <a id="signin-link" href="/login" class="reset-btn signin-btn" title="Sign in" hidden>Sign in</a>
+        </div>
+      </header>
 
-    <form id="chat-form" class="composer">
-      <textarea
-        id="input"
-        class="input"
-        placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-        rows="1"
-        autocomplete="off"
-      ></textarea>
-      <button id="send-btn" type="submit" class="send-btn">Send</button>
-    </form>
+      <main id="messages" class="messages"></main>
+
+      <form id="chat-form" class="composer">
+        <div class="composer-pill">
+          <textarea
+            id="input"
+            class="input"
+            placeholder="Message ZORA…"
+            rows="1"
+            autocomplete="off"
+          ></textarea>
+          <button id="send-btn" type="submit" class="send-btn" aria-label="Send message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <p class="composer-hint">ZORA can search the web · Enter to send, Shift+Enter for newline</p>
+      </form>
+    </div>
   </div>
 
-  <script src="/script.js"></script>
+  <script src="/script.js?v=11"></script>
 </body>
 </html>
