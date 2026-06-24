@@ -15,11 +15,14 @@ import re
 
 import bcrypt
 from authlib.integrations.starlette_client import OAuth, OAuthError
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from db import create_email_user, get_user_by_email, upsert_google_user
+
+load_dotenv()
 
 router = APIRouter()
 
@@ -60,24 +63,34 @@ async def _get_google_profile(request: Request) -> dict:
     if not token:
         raise ValueError("No token returned from Google.")
 
-    try:
-        claims = await oauth.google.parse_id_token(request, token)
-    except Exception as exc:
-        raise ValueError("Unable to verify Google ID token.") from exc
+    userinfo = token.get("userinfo")
+    if not userinfo:
+        try:
+            userinfo = await oauth.google.userinfo(token=token)
+        except Exception:
+            try:
+                claims = await oauth.google.parse_id_token(request, token)
+            except Exception as exc:
+                raise ValueError("Unable to verify Google profile.") from exc
+            userinfo = claims
 
-    if not claims.get("email_verified"):
+    verified = userinfo.get("email_verified")
+    if verified is None:
+        verified = userinfo.get("verified_email")
+
+    if not verified:
         raise ValueError("Google email is not verified.")
 
-    email = claims.get("email")
-    sub = claims.get("sub")
+    email = userinfo.get("email")
+    sub = userinfo.get("sub") or userinfo.get("id")
     if not email or not sub:
         raise ValueError("Incomplete Google profile returned from Google.")
 
     return {
         "google_sub": sub,
         "email": email.strip().lower(),
-        "name": claims.get("name", "") or "",
-        "picture": claims.get("picture", "") or "",
+        "name": userinfo.get("name", "") or "",
+        "picture": userinfo.get("picture", "") or "",
     }
 
 

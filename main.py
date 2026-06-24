@@ -10,6 +10,9 @@ from typing import Annotated, List
 from typing_extensions import TypedDict
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,8 +33,6 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from groq import BadRequestError
 
 from ddgs import DDGS
-
-load_dotenv()
 
 # --------------------------------------------------------------------------- #
 # Agent graph (ported from the notebook)
