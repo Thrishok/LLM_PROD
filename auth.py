@@ -15,11 +15,14 @@ import re
 
 import bcrypt
 from authlib.integrations.starlette_client import OAuth, OAuthError
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from db import create_email_user, get_user_by_email, upsert_google_user
+
+load_dotenv()
 
 router = APIRouter()
 
