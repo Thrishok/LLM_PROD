@@ -11,7 +11,10 @@ from typing_extensions import TypedDict
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
+load_dotenv(dotenv_path='.env')
+
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
@@ -33,8 +36,6 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from groq import BadRequestError
 
 from ddgs import DDGS
-
-load_dotenv()
 
 # --------------------------------------------------------------------------- #
 # Agent graph (ported from the notebook)
