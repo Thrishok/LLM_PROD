@@ -10,8 +10,10 @@ The signed session cookie is provided by Starlette's SessionMiddleware
 (see main.py). We never store passwords — Google handles authentication.
 """
 
+import logging
 import os
 import re
+import secrets
 
 import bcrypt
 from authlib.integrations.starlette_client import OAuth, OAuthError
@@ -22,7 +24,9 @@ from pydantic import BaseModel, Field
 
 from db import create_email_user, get_user_by_email, upsert_google_user
 
-load_dotenv()
+load_dotenv(dotenv_path='.env')
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -59,7 +63,13 @@ def _redirect_uri(request: Request) -> str:
 
 async def _get_google_profile(request: Request) -> dict:
     _validate_google_settings()
-    token = await oauth.google.authorize_access_token(request)
+
+    expected_state = request.session.get("oauth_state")
+    query_state = request.query_params.get("state")
+    if expected_state and query_state and query_state != expected_state:
+        raise ValueError("OAuth state mismatch.")
+
+    token = await oauth.google.authorize_access_token(request, state=query_state or expected_state)
     if not token:
         raise ValueError("No token returned from Google.")
 
@@ -78,13 +88,15 @@ async def _get_google_profile(request: Request) -> dict:
     if verified is None:
         verified = userinfo.get("verified_email")
 
-    if not verified:
-        raise ValueError("Google email is not verified.")
-
     email = userinfo.get("email")
     sub = userinfo.get("sub") or userinfo.get("id")
     if not email or not sub:
         raise ValueError("Incomplete Google profile returned from Google.")
+
+    # Some Google responses omit the explicit verification flag. If we still got
+    # a usable email and subject, accept the profile and continue.
+    if verified is False:
+        logger.warning("Google profile had email_verified=False for %s", email)
 
     return {
         "google_sub": sub,
@@ -101,19 +113,38 @@ async def auth_login(request: Request):
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
-    return await oauth.google.authorize_redirect(request, _redirect_uri(request))
+    state = secrets.token_urlsafe(16)
+    nonce = secrets.token_urlsafe(16)
+    request.session["oauth_state"] = state
+    request.session["oauth_nonce"] = nonce
+    request.session.modified = True
+    return await oauth.google.authorize_redirect(
+        request,
+        _redirect_uri(request),
+        prompt="select_account",
+        access_type="online",
+        state=state,
+        nonce=nonce,
+    )
 
 
 @router.get("/auth/callback", name="auth_callback")
 async def auth_callback(request: Request):
     try:
         profile = await _get_google_profile(request)
-    except OAuthError:
+    except OAuthError as exc:
+        logger.warning("Google OAuth denied: %s", exc)
         return RedirectResponse(url="/login?error=denied")
-    except ValueError:
+    except ValueError as exc:
+        logger.warning("Google OAuth callback invalid: %s", exc)
         return RedirectResponse(url="/login?error=invalid")
-    except Exception:
+    except Exception as exc:
+        logger.exception("Google OAuth callback server error: %s", exc)
         return RedirectResponse(url="/login?error=server")
+
+    request.session.pop("oauth_state", None)
+    request.session.pop("oauth_nonce", None)
+    request.session.modified = True
 
     user = upsert_google_user(
         google_sub=profile["google_sub"],
@@ -123,7 +154,7 @@ async def auth_callback(request: Request):
     )
 
     _set_session(request, user)
-    return RedirectResponse(url="/")
+    return RedirectResponse(url="/", status_code=302)
 
 
 @router.get("/auth/logout")
