@@ -465,6 +465,37 @@ headerUserBtn.addEventListener("click", (e) => {
   userMenu.hidden = !userMenu.hidden;
 });
 
+// --------------------------------------------------------------------------- //
+// Sign out
+// --------------------------------------------------------------------------- //
+
+// Handle logout in JS so it's reliable regardless of page caching: clear the
+// server session, drop local state, then *replace* history so the Back button
+// can't restore the (bfcache'd) authenticated page and make it look like the
+// sign-out failed.
+async function doLogout(e) {
+  if (e) e.preventDefault();
+  isAuthenticated = false;
+  currentUser = null;
+  try {
+    await fetch("/auth/logout", { credentials: "same-origin", cache: "no-store" });
+  } catch (_) {
+    /* network hiccup — still send the user to the login page */
+  }
+  location.replace("/login");
+}
+
+// Both sign-out controls (header menu + sidebar footer) route through here.
+for (const el of document.querySelectorAll('a[href="/auth/logout"]')) {
+  el.addEventListener("click", doLogout);
+}
+
+// If the browser restores this page from the back/forward cache after a
+// sign-out, force a fresh load so we never show stale, logged-in content.
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) location.reload();
+});
+
 document.addEventListener("click", (e) => {
   if (!userMenu.hidden && !e.target.closest(".header-user-wrap")) {
     userMenu.hidden = true;
