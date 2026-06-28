@@ -993,3 +993,51 @@ a.reset-btn {
   width: 18px;
   height: 18px;
 }
+
+/* Markdown rendered inside assistant bubbles */
+.bubble p { margin: 0 0 8px; }
+.bubble p:last-child { margin-bottom: 0; }
+.bubble ul, .bubble ol { margin: 6px 0; padding-left: 20px; }
+.bubble li { margin-bottom: 4px; }
+.bubble strong { font-weight: 700; }
+.bubble em { font-style: italic; }
+.bubble code {
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 13px;
+  font-family: "Fira Code", "Courier New", monospace;
+}
+.bubble pre {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.bubble pre code { background: none; padding: 0; font-size: 13px; }
+
+/* Tables */
+.bubble table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 14px;
+  overflow-x: auto;
+  display: block;
+}
+.bubble th, .bubble td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+.bubble th {
+  background: var(--panel-2);
+  font-weight: 600;
+  color: var(--text);
+}
+.bubble tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+
+/* Remove pre-wrap from assistant bubble since marked handles formatting */
+.message.assistant .bubble { white-space: normal; }

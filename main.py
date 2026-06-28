@@ -70,11 +70,11 @@ def duckduckgo_search_tool(query: str, max_results: int = 5) -> str:
 tools = [duckduckgo_search_tool]
 llm_with_tools = llm.bind_tools(tools)
 
-SYSTEM_PROMPT = """You are a helpful assistant with one tool: duckduckgo_search_tool(query, max_results).
+SYSTEM_PROMPT = """You are a helpful assistant with one tool: duckduckgo_search_tool.
 
-Use it ONLY when you need fresh, real-world, or factual info you don't already know (news, scores, prices, current events, recent facts). For chit-chat, opinions, or things you already know, answer directly without calling it.
+Use it ONLY for: current news, live prices/scores, events after your knowledge cutoff, or when the user explicitly asks to search the web.
 
-When you call the tool, summarise the returned results clearly and cite nothing you didn't get back. Do not invent facts. Do not call any tool other than duckduckgo_search_tool."""
+For everything else — coding, explanations, history, opinions, general knowledge — answer directly without calling the tool."""
 
 
 def tool_calling_node(state: State):
@@ -153,8 +153,9 @@ def chat(req: ChatRequest, user: dict = Depends(current_user)):
         conv_id = db.create_conversation(user["id"])
 
     # Rebuild the LLM context from stored history (restart-safe, per user).
+    MAX_HISTORY_TURNS = 10
     history: List[BaseMessage] = []
-    for role, content in db.get_history(conv_id):
+    for role, content in db.get_history(conv_id)[-MAX_HISTORY_TURNS * 2:]:
         history.append(
             HumanMessage(content=content) if role == "user" else AIMessage(content=content)
         )

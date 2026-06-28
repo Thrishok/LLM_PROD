@@ -261,10 +261,15 @@ function addMessage(text, role) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.textContent = text;
+  if (role === "assistant") {
+    bubble.innerHTML = marked.parse(text);
+  } else {
+    bubble.textContent = text;
+  }
   content.appendChild(bubble);
 
   if (role === "assistant") {
+    bubble.dataset.raw = text;
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "copy-btn";
@@ -397,7 +402,7 @@ messagesEl.addEventListener("click", (e) => {
   const copyBtn = e.target.closest(".copy-btn");
   if (copyBtn) {
     const bubble = copyBtn.parentElement.querySelector(".bubble");
-    navigator.clipboard.writeText(bubble.textContent).then(() => {
+    navigator.clipboard.writeText(bubble.dataset.raw || bubble.textContent).then(() => {
       const label = copyBtn.querySelector(".copy-label");
       copyBtn.classList.add("copied");
       label.textContent = "Copied!";
