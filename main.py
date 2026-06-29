@@ -30,10 +30,11 @@ from db import init_db
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_groq import ChatGroq
-from langgraph.graph import START, StateGraph
+from langgraph.graph import START, END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from groq import BadRequestError
+from functools import lru_cache
 
 from ddgs import DDGS
 
@@ -46,11 +47,9 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-llm = ChatGroq(model_name="openai/gpt-oss-120b", api_key=os.getenv("GROQ_API_KEY"))
-
 
 @tool
-def duckduckgo_search_tool(query: str, max_results: int = 5) -> str:
+def duckduckgo_search_tool(query: str, max_results: int = 3) -> str:
     """Search the web via DuckDuckGo for fresh/factual info. Returns formatted results."""
     try:
         with DDGS() as ddg:
@@ -68,26 +67,67 @@ def duckduckgo_search_tool(query: str, max_results: int = 5) -> str:
 
 
 tools = [duckduckgo_search_tool]
-llm_with_tools = llm.bind_tools(tools)
+
+# Minimal schema tool for TPM-limited models (same function, stripped description)
+from langchain_core.tools import StructuredTool
+import pydantic
+
+class _SearchInput(pydantic.BaseModel):
+    query: str
+
+_search_minimal = StructuredTool(
+    name="duckduckgo_search_tool",
+    description="Search the web.",
+    args_schema=_SearchInput,
+    func=lambda query: duckduckgo_search_tool.invoke({"query": query, "max_results": 3}),
+)
+tools_minimal = [_search_minimal]
 
 SYSTEM_PROMPT = """You are a helpful assistant with one tool: duckduckgo_search_tool.
 
-Use it ONLY for: current news, live prices/scores, events after your knowledge cutoff, or when the user explicitly asks to search the web.
+You MUST call duckduckgo_search_tool for: current news, live prices (gold, stocks, crypto), sports scores, weather, or any real-time/recent information. Do not say you cannot access the internet — use the tool instead.
 
 For everything else — coding, explanations, history, opinions, general knowledge — answer directly without calling the tool."""
 
 
-def tool_calling_node(state: State):
-    messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
+
+SUMMARIZE_AFTER = 10
+MAX_HISTORY_TURNS = 4
 
 
-def build_graph():
+def _summarize(conv_id: int) -> None:
+    """Summarize all but the last 10 messages, store summary, delete old messages."""
+    history = db.get_history(conv_id)
+    to_summarize = history[:-MAX_HISTORY_TURNS * 2]
+    if not to_summarize:
+        return
+
+    existing_summary = db.get_summary(conv_id)
+    transcript = "\n".join(f"{role.upper()}: {content}" for role, content in to_summarize)
+    prompt = f"""Summarize the following conversation into concise bullet points capturing key facts, decisions, and context. Be brief.
+
+{f'Previous summary:{chr(10)}{existing_summary}{chr(10)}{chr(10)}' if existing_summary else ''}Conversation to summarize:
+{transcript}"""
+
+    result = ChatGroq(model_name="llama-3.1-8b-instant", api_key=os.getenv("GROQ_API_KEY"), max_tokens=1024).invoke([HumanMessage(content=prompt)])
+    db.set_summary(conv_id, result.content)
+    db.delete_old_messages(conv_id, keep_last=MAX_HISTORY_TURNS * 2)
+
+
+@lru_cache(maxsize=8)
+def build_graph(model_name: str, max_tokens: int):
+    gpt_oss = model_name in ("openai/gpt-oss-120b", "openai/gpt-oss-20b")
+    _llm = ChatGroq(model_name=model_name, api_key=os.getenv("GROQ_API_KEY"), max_tokens=max_tokens)
+    _tool_list = tools_minimal if gpt_oss else tools
+    _llm_bound = _llm.bind_tools(_tool_list)
+
+    def _tool_calling_node(state: State):
+        messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+        return {"messages": [_llm_bound.invoke(messages)]}
+
     builder = StateGraph(State)
-    builder.add_node("tool_calling_node", tool_calling_node)
-    builder.add_node("tools", ToolNode(tools))
-
+    builder.add_node("tool_calling_node", _tool_calling_node)
+    builder.add_node("tools", ToolNode(_tool_list))
     builder.add_edge(START, "tool_calling_node")
     builder.add_conditional_edges("tool_calling_node", tools_condition)
     builder.add_edge("tools", "tool_calling_node")
@@ -95,7 +135,7 @@ def build_graph():
     return builder.compile()
 
 
-graph = build_graph()
+graph = build_graph("llama-3.3-70b-versatile", 4096)
 
 # --------------------------------------------------------------------------- #
 # FastAPI app
@@ -125,6 +165,7 @@ class ChatRequest(BaseModel):
     conversation_id: int | None = Field(
         None, description="Conversation to continue; omit to start a new one"
     )
+    model: str = Field(default="llama-3.3-70b-versatile", description="Groq model to use")
 
 
 class ChatResponse(BaseModel):
@@ -152,17 +193,39 @@ def chat(req: ChatRequest, user: dict = Depends(current_user)):
     if is_new:
         conv_id = db.create_conversation(user["id"])
 
+    MAX_TOKENS = {
+        "llama-3.1-8b-instant": 4096,
+        "llama-3.3-70b-versatile": 4096,
+        "openai/gpt-oss-20b": 4096,
+        "openai/gpt-oss-120b": 4096,
+    }
+    max_tokens = MAX_TOKENS.get(req.model, 8192)
+    request_graph = build_graph(req.model, max_tokens)
+
+    # Trigger summarization if conversation has grown large.
+    if db.count_messages(conv_id) > SUMMARIZE_AFTER:
+        _summarize(conv_id)
+
+    # Smaller context window for TPM-limited models.
+    MODEL_MAX_HISTORY = {
+        "openai/gpt-oss-120b": 4,
+        "openai/gpt-oss-20b": 6,
+    }
+    max_turns = MODEL_MAX_HISTORY.get(req.model, MAX_HISTORY_TURNS)
+
     # Rebuild the LLM context from stored history (restart-safe, per user).
-    MAX_HISTORY_TURNS = 10
     history: List[BaseMessage] = []
-    for role, content in db.get_history(conv_id)[-MAX_HISTORY_TURNS * 2:]:
+    summary = db.get_summary(conv_id)
+    if summary:
+        history.append(SystemMessage(content=f"Summary of earlier conversation:\n{summary}"))
+    for role, content in db.get_history(conv_id)[-max_turns * 2:]:
         history.append(
             HumanMessage(content=content) if role == "user" else AIMessage(content=content)
         )
     history.append(HumanMessage(content=req.message))
 
     try:
-        result = graph.invoke({"messages": history})
+        result = request_graph.invoke({"messages": history})
     except BadRequestError:
         # Don't leave an empty conversation behind if the very first turn fails.
         if is_new:
@@ -183,10 +246,13 @@ def chat(req: ChatRequest, user: dict = Depends(current_user)):
     answer = result["messages"][-1].content
 
     # Persist the turn; name a brand-new conversation after its first message.
+    # Truncate long assistant replies before storing to prevent token bloat on replay.
+    MAX_STORED_CHARS = 2000
+    stored_answer = answer[:MAX_STORED_CHARS] + "…[truncated]" if len(answer) > MAX_STORED_CHARS else answer
     title = db.append_turn(
         conv_id,
         req.message,
-        answer,
+        stored_answer,
         _title_from(req.message) if is_new else None,
     )
 

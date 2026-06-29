@@ -263,6 +263,23 @@ function addMessage(text, role) {
   bubble.className = "bubble";
   if (role === "assistant") {
     bubble.innerHTML = marked.parse(text);
+    // Add copy button to every code block
+    bubble.querySelectorAll("pre").forEach((pre) => {
+      const code = pre.querySelector("code");
+      if (!code) return;
+      pre.style.position = "relative";
+      const btn = document.createElement("button");
+      btn.className = "pre-copy-btn";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(code.innerText).then(() => {
+          btn.textContent = "Copied!";
+          btn.classList.add("copied");
+          setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 1500);
+        });
+      });
+      pre.appendChild(btn);
+    });
   } else {
     bubble.textContent = text;
   }
@@ -313,6 +330,8 @@ function autoGrow() {
   input.style.height = Math.min(input.scrollHeight, 160) + "px";
 }
 
+const modelSelect = document.getElementById("model-select");
+
 async function sendMessage(text) {
   addMessage(text, "user");
   const typing = showTyping();
@@ -322,7 +341,7 @@ async function sendMessage(text) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, conversation_id: currentConversationId }),
+      body: JSON.stringify({ message: text, conversation_id: currentConversationId, model: modelSelect.value }),
     });
 
     typing.remove();
