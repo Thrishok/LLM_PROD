@@ -52,6 +52,7 @@ body {
   display: flex;
   height: 100vh;
   width: 100%;
+  overflow: hidden; /* the app shell never scrolls; only .messages scrolls */
 }
 
 .sidebar {
@@ -79,18 +80,35 @@ body {
   background: var(--panel);
 }
 
+/* Tap-to-close backdrop (mobile only) */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 15;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     position: absolute;
     top: 0;
     left: 0;
+    width: min(82vw, 300px);
     height: 100vh;
-    z-index: 20;
+    z-index: 40; /* above the header (30) so it overlays fully */
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  }
+
+  .sidebar-backdrop {
+    display: block; /* shown when not [hidden] */
+    z-index: 35;
   }
 }
 
 .header {
+  position: relative;
+  z-index: 30; /* keep the account dropdown above the chat messages */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -370,12 +388,19 @@ a.reset-btn {
 
 .messages {
   flex: 1;
+  min-height: 0; /* allow the flex child to shrink so it scrolls internally, not the page */
   overflow-y: auto;
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
+}
+
+/* On the welcome screen there's nothing to scroll — keep it fixed & centered. */
+.messages:has(.welcome) {
+  overflow: hidden;
+  justify-content: center;
 }
 
 /* Slim, themed scrollbar */
@@ -547,7 +572,7 @@ a.reset-btn {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 24px 12px;
+  padding: 12px;
   animation: msg-in 0.4s ease both;
 }
 
@@ -591,8 +616,8 @@ a.reset-btn {
 }
 
 .welcome-logo img {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   object-fit: contain;
   filter: drop-shadow(0 8px 20px rgba(99, 102, 241, 0.35));
   animation: logo-pulse 3.6s ease-in-out infinite;
@@ -613,9 +638,9 @@ a.reset-btn {
 }
 
 .welcome-title {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  margin: 18px 0 6px;
+  margin: 12px 0 5px;
   color: var(--text);
 }
 
@@ -630,8 +655,8 @@ a.reset-btn {
 .suggestions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 26px;
+  gap: 8px;
+  margin-top: 16px;
   width: 100%;
   max-width: 520px;
 }
@@ -640,7 +665,7 @@ a.reset-btn {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 13px 15px;
+  padding: 11px 14px;
   font-size: 14px;
   font-family: inherit;
   color: var(--text);
@@ -696,15 +721,122 @@ a.reset-btn {
 /* Pill that wraps the textarea + send button */
 .composer-pill {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 6px;
   width: 100%;
   max-width: 800px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 18px;
-  padding: 7px 7px 7px 16px;
+  padding: 7px 7px 7px 8px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Attach (+) button */
+.attach-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.attach-btn:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+.attach-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Selected-file preview chip above the composer */
+.attach-preview {
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 8px;
+  display: flex;
+}
+
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.attach-chip .file-icon {
+  display: flex;
+  color: var(--accent);
+}
+
+.attach-chip .file-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.attach-chip .file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.attach-chip .file-size {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.attach-chip .file-remove {
+  display: flex;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.attach-chip .file-remove:hover {
+  color: #fca5a5;
+}
+
+.attach-chip .file-remove svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Attachment shown inside a sent user message */
+.bubble-attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+
+.bubble-attach svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .composer-pill:focus-within {
@@ -993,244 +1125,3 @@ a.reset-btn {
   width: 18px;
   height: 18px;
 }
-
-/* Markdown rendered inside assistant bubbles */
-.bubble p { margin: 0 0 8px; }
-.bubble p:last-child { margin-bottom: 0; }
-.bubble ul, .bubble ol { margin: 6px 0; padding-left: 20px; }
-.bubble li { margin-bottom: 4px; }
-.bubble strong { font-weight: 700; }
-.bubble em { font-style: italic; }
-.bubble code {
-  background: rgba(255,255,255,0.08);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 13px;
-  font-family: "Fira Code", "Courier New", monospace;
-}
-.bubble pre {
-  background: rgba(0,0,0,0.3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-.bubble pre code { background: none; padding: 0; font-size: 13px; }
-
-/* Tables */
-.bubble table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 10px 0;
-  font-size: 14px;
-  overflow-x: auto;
-  display: block;
-}
-.bubble th, .bubble td {
-  border: 1px solid var(--border);
-  padding: 8px 12px;
-  text-align: left;
-}
-.bubble th {
-  background: var(--panel-2);
-  font-weight: 600;
-  color: var(--text);
-}
-.bubble tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
-
-/* Remove pre-wrap from assistant bubble since marked handles formatting */
-.message.assistant .bubble { white-space: normal; }
-
-/* Model selector dropdown */
-.model-select {
-  flex-shrink: 0;
-  background: var(--panel-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-  transition: border-color 0.15s ease, color 0.15s ease;
-  max-width: 130px;
-}
-.model-select:hover, .model-select:focus {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.model-row {
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-  width: 100%;
-  max-width: 800px;
-}
-.model-select {
-  background: var(--panel-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-  flex-shrink: unset;
-  max-width: unset;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.model-select:hover, .model-select:focus {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-/* Model select — left side of composer pill */
-.model-select {
-  flex-shrink: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--panel-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 6px 28px 6px 10px;
-  font-size: 12px;
-  font-family: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  outline: none;
-  max-width: 130px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-}
-.model-select:hover {
-  border-color: var(--accent);
-  color: var(--text);
-}
-.model-select:focus {
-  border-color: var(--accent);
-  color: var(--text);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
-  background-color: var(--bg);
-}
-
-/* Right-side model select — vertically centered in pill */
-.model-select {
-  align-self: center;
-  height: 36px;
-  padding: 0 28px 0 10px;
-  margin: 0 4px;
-}
-
-/* Code block copy button */
-.bubble pre {
-  position: relative;
-}
-.pre-copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: var(--panel-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 10px;
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.bubble pre:hover .pre-copy-btn {
-  opacity: 1;
-}
-.pre-copy-btn:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-.pre-copy-btn.copied {
-  color: #22c55e;
-  border-color: #22c55e;
-  opacity: 1;
-}
-
-/* Final model-select override — cleans up all previous duplicates */
-.model-select {
-  flex-shrink: 0;
-  align-self: center;
-  appearance: none;
-  -webkit-appearance: none;
-  height: 34px;
-  background: var(--panel-2);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 28px 0 10px;
-  font-size: 12px;
-  font-family: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  outline: none;
-  margin: 0 2px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-}
-.model-select:hover { border-color: var(--accent); color: var(--text); }
-.model-select:focus { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px rgba(99,102,241,0.18); }
-
-/* Code block background: light in dark mode, dark in light mode */
-.bubble pre {
-  background: #f0f2f8;
-  border-color: #d0d4e0;
-}
-.bubble pre code {
-  color: #1b1e27;
-}
-:root[data-theme="light"] .bubble pre {
-  background: #1b1e27;
-  border-color: #2a2f3a;
-}
-:root[data-theme="light"] .bubble pre code {
-  color: #e6e8ee;
-}
-:root[data-theme="light"] .pre-copy-btn {
-  background: #2a2f3a;
-  color: #9aa3b2;
-  border-color: #3a4150;
-}
-:root[data-theme="light"] .pre-copy-btn:hover {
-  color: #e6e8ee;
-}
-
-/* Dark mode code block — light grey */
-.bubble pre {
-  background: #e8eaf0;
-  border-color: #c8cdd8;
-}
-.bubble pre code {
-  color: #1b1e27;
-}
-
-/* Bolder code text */
-.bubble pre code {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* Dark mode code block — enforce light grey */
-:root:not([data-theme="light"]) .bubble pre {
-  background: #e8eaf0 !important;
-  border-color: #c8cdd8 !important;
-}
-:root:not([data-theme="light"]) .bubble pre code {
-  color: #1b1e27 !important;
-}
-

@@ -6,6 +6,24 @@ const sidebar = document.getElementById("sidebar");
 const convListEl = document.getElementById("conv-list");
 const newChatBtn = document.getElementById("new-chat-btn");
 const sidebarToggle = document.getElementById("sidebar-toggle");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+const HAMBURGER_ICON =
+  '<line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line>';
+const CLOSE_ICON =
+  '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+
+function isMobile() {
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
+// Open/close the sidebar and keep the toggle icon (☰ vs ✕) + backdrop in sync.
+function setSidebar(open) {
+  sidebar.hidden = !open;
+  sidebarBackdrop.hidden = !open;
+  const svg = sidebarToggle.querySelector("svg");
+  if (svg) svg.innerHTML = open ? CLOSE_ICON : HAMBURGER_ICON;
+}
 
 const LOGO = "/logo_icon.png?v=3";
 
@@ -105,8 +123,9 @@ async function loadUser() {
     badge.hidden = false;
     signoutLink.hidden = false;
 
-    sidebar.hidden = false;
     sidebarToggle.hidden = false;
+    // Open by default on desktop, collapsed on mobile.
+    setSidebar(!isMobile());
 
     loadConversations();
   } catch (_) {
@@ -163,7 +182,7 @@ async function openConversation(id) {
     messagesEl.innerHTML = "";
     for (const m of conv.messages) addMessage(m.content, m.role);
     markActive();
-    if (window.matchMedia("(max-width: 768px)").matches) sidebar.hidden = true;
+    if (isMobile()) setSidebar(false);
     input.focus();
   } catch (_) {
     /* ignore */
@@ -190,6 +209,7 @@ function startNewChat() {
   currentConversationId = null;
   renderWelcome();
   markActive();
+  if (isMobile()) setSidebar(false);
   input.focus();
 }
 
@@ -240,7 +260,7 @@ function buildAvatar(role) {
   return avatar;
 }
 
-function addMessage(text, role) {
+function addMessage(text, role, attachmentName = null) {
   hideWelcome();
 
   const wrap = document.createElement("div");
@@ -261,32 +281,16 @@ function addMessage(text, role) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  if (role === "assistant") {
-    bubble.innerHTML = marked.parse(text);
-    // Add copy button to every code block
-    bubble.querySelectorAll("pre").forEach((pre) => {
-      const code = pre.querySelector("code");
-      if (!code) return;
-      pre.style.position = "relative";
-      const btn = document.createElement("button");
-      btn.className = "pre-copy-btn";
-      btn.textContent = "Copy";
-      btn.addEventListener("click", () => {
-        navigator.clipboard.writeText(code.innerText).then(() => {
-          btn.textContent = "Copied!";
-          btn.classList.add("copied");
-          setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 1500);
-        });
-      });
-      pre.appendChild(btn);
-    });
-  } else {
-    bubble.textContent = text;
+  if (text) bubble.appendChild(document.createTextNode(text));
+  if (role === "user" && attachmentName) {
+    const att = document.createElement("span");
+    att.className = "bubble-attach";
+    att.innerHTML = `${fileGlyph()}<span>${escapeHtml(attachmentName)}</span>`;
+    bubble.appendChild(att);
   }
   content.appendChild(bubble);
 
   if (role === "assistant") {
-    bubble.dataset.raw = text;
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "copy-btn";
@@ -330,18 +334,21 @@ function autoGrow() {
   input.style.height = Math.min(input.scrollHeight, 160) + "px";
 }
 
-const modelSelect = document.getElementById("model-select");
-
-async function sendMessage(text) {
-  addMessage(text, "user");
+async function sendMessage(text, file) {
+  addMessage(text, "user", file ? file.name : null);
   const typing = showTyping();
   sendBtn.disabled = true;
+
+  // The backend is text-only, so we note the attachment by name in the message.
+  const payloadMessage = file
+    ? `${text ? text + "\n\n" : ""}[Attached file: ${file.name}]`
+    : text;
 
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, conversation_id: currentConversationId, model: modelSelect.value }),
+      body: JSON.stringify({ message: payloadMessage, conversation_id: currentConversationId }),
     });
 
     typing.remove();
@@ -385,16 +392,18 @@ function promptSignIn() {
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = input.value.trim();
-  if (!text) return;
+  if (!text && !selectedFile) return;
 
   if (!isAuthenticated) {
     promptSignIn();
     return;
   }
 
+  const file = selectedFile;
   input.value = "";
   autoGrow();
-  sendMessage(text);
+  clearAttachment();
+  sendMessage(text, file);
 });
 
 // Enter sends, Shift+Enter inserts a newline.
@@ -406,6 +415,83 @@ input.addEventListener("keydown", (e) => {
 });
 
 input.addEventListener("input", autoGrow);
+
+// --------------------------------------------------------------------------- //
+// File attachment (+)
+// --------------------------------------------------------------------------- //
+
+const attachBtn = document.getElementById("attach-btn");
+const fileInput = document.getElementById("file-input");
+const attachPreview = document.getElementById("attach-preview");
+const ALLOWED_EXT = [".jpg", ".jpeg", ".png", ".doc", ".docx", ".pdf"];
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+let selectedFile = null;
+
+function fileGlyph() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
+}
+
+function closeGlyph() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+}
+
+function humanSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function renderAttachPreview() {
+  if (!selectedFile) {
+    attachPreview.hidden = true;
+    attachPreview.innerHTML = "";
+    return;
+  }
+  attachPreview.hidden = false;
+  attachPreview.innerHTML = `
+    <span class="attach-chip">
+      <span class="file-icon">${fileGlyph()}</span>
+      <span class="file-name">${escapeHtml(selectedFile.name)}</span>
+      <span class="file-size">${humanSize(selectedFile.size)}</span>
+      <button type="button" class="file-remove" aria-label="Remove file">${closeGlyph()}</button>
+    </span>`;
+}
+
+function clearAttachment() {
+  selectedFile = null;
+  fileInput.value = "";
+  renderAttachPreview();
+}
+
+attachBtn.addEventListener("click", () => {
+  if (!isAuthenticated) {
+    promptSignIn();
+    return;
+  }
+  fileInput.click();
+});
+
+fileInput.addEventListener("change", () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+  if (!ALLOWED_EXT.includes(ext)) {
+    addMessage(`"${file.name}" isn't a supported type. Allowed: JPG, PNG, DOC, DOCX, PDF.`, "error");
+    clearAttachment();
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    addMessage(`"${file.name}" is too large (max 10 MB).`, "error");
+    clearAttachment();
+    return;
+  }
+  selectedFile = file;
+  renderAttachPreview();
+});
+
+attachPreview.addEventListener("click", (e) => {
+  if (e.target.closest(".file-remove")) clearAttachment();
+});
 
 // Delegated clicks in the messages area: suggestion chips + copy buttons.
 messagesEl.addEventListener("click", (e) => {
@@ -421,7 +507,7 @@ messagesEl.addEventListener("click", (e) => {
   const copyBtn = e.target.closest(".copy-btn");
   if (copyBtn) {
     const bubble = copyBtn.parentElement.querySelector(".bubble");
-    navigator.clipboard.writeText(bubble.dataset.raw || bubble.textContent).then(() => {
+    navigator.clipboard.writeText(bubble.textContent).then(() => {
       const label = copyBtn.querySelector(".copy-label");
       copyBtn.classList.add("copied");
       label.textContent = "Copied!";
@@ -533,8 +619,10 @@ document.addEventListener("keydown", (e) => {
 newChatBtn.addEventListener("click", startNewChat);
 
 sidebarToggle.addEventListener("click", () => {
-  sidebar.hidden = !sidebar.hidden;
+  setSidebar(sidebar.hidden); // if currently hidden -> open, else close
 });
+
+sidebarBackdrop.addEventListener("click", () => setSidebar(false));
 
 // Initial render.
 renderWelcome();

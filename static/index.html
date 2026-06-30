@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZORA- AI Assistant</title>
   <link rel="icon" type="image/png" href="/logo_icon.png?v=3" />
-  <link rel="stylesheet" href="/style.css?v=15" />
+  <link rel="stylesheet" href="/style.css?v=21" />
 </head>
 <body>
   <div class="layout">
@@ -41,6 +41,9 @@
       </div>
     </aside>
 
+    <!-- Dimmed backdrop behind the sidebar on mobile (tap to close) -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
+
     <div class="app">
       <header class="header">
         <div class="header-title">
@@ -75,15 +78,6 @@
                 <span id="theme-label">Light mode</span>
                 <span class="switch"><span class="switch-knob"></span></span>
               </button>
-              <a href="/auth/logout" class="user-menu-item user-menu-danger">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                Sign out
-              </a>
             </div>
           </div>
           <a id="signin-link" href="/login" class="reset-btn signin-btn" title="Sign in" hidden>Sign in</a>
@@ -93,7 +87,17 @@
       <main id="messages" class="messages"></main>
 
       <form id="chat-form" class="composer">
+        <div id="attach-preview" class="attach-preview" hidden></div>
         <div class="composer-pill">
+          <button id="attach-btn" type="button" class="attach-btn"
+                  aria-label="Attach a file" title="Attach a file (JPG, PNG, DOC, PDF)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <input id="file-input" type="file" accept=".jpg,.jpeg,.png,.doc,.docx,.pdf" hidden />
           <textarea
             id="input"
             class="input"
@@ -101,12 +105,6 @@
             rows="1"
             autocomplete="off"
           ></textarea>
-          <select id="model-select" class="model-select">
-            <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-            <option value="llama-3.1-8b-instant">Llama 3.1 8B</option>
-            <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
-            <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
-          </select>
           <button id="send-btn" type="submit" class="send-btn" aria-label="Send message">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
@@ -115,7 +113,7 @@
             </svg>
           </button>
         </div>
-        <p class="composer-hint">ZORA can search the web · Enter to send, Shift+Enter for newline</p>
+        <p class="composer-hint">ZORA is AI-powered and can make mistakes — please verify important information.</p>
       </form>
 
       <footer class="app-footer">
@@ -126,7 +124,6 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="/script.js?v=13"></script>
+  <script src="/script.js?v=14"></script>
 </body>
 </html>
