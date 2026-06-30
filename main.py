@@ -1,5 +1,4 @@
 """FastAPI chat application backed by a LangGraph agent.
-
 Converted from main.ipynb. The agent uses a Groq-hosted LLM with a single
 DuckDuckGo web-search tool, exposed over an HTTP API plus a small web UI.
 """
