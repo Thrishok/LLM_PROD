@@ -78,15 +78,19 @@ def create_email_user(email: str, password_hash: str, name: str) -> User:
 def upsert_google_user(google_sub: str, email: str, name: str, picture: str) -> User:
     """Create or update a Google user, linking to an existing email account if present."""
     with Session(engine) as session:
-        user = session.exec(select(User).where(User.email == email)).first()
+        user = session.exec(select(User).where(User.google_sub == google_sub)).first()
+        if user is None:
+            user = session.exec(select(User).where(User.email == email)).first()
+
         if user is None:
             user = User(google_sub=google_sub, email=email, name=name, picture=picture)
             session.add(user)
         else:
-            # Link Google to an existing (possibly email/password) account.
             user.google_sub = google_sub
+            user.email = email
             user.name = name or user.name
             user.picture = picture or user.picture
+
         session.commit()
         session.refresh(user)
         return user
@@ -103,6 +107,7 @@ class Conversation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
     title: str = "New chat"
+    summary: Optional[str] = Field(default=None)  # rolling summary of old messages
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -167,6 +172,39 @@ def get_history(conv_id: int) -> list[tuple]:
             select(Message).where(Message.conversation_id == conv_id).order_by(Message.id)
         ).all()
         return [(m.role, m.content) for m in msgs]
+
+
+def count_messages(conv_id: int) -> int:
+    with Session(engine) as session:
+        return len(session.exec(
+            select(Message).where(Message.conversation_id == conv_id)
+        ).all())
+
+
+def get_summary(conv_id: int) -> Optional[str]:
+    with Session(engine) as session:
+        conv = session.get(Conversation, conv_id)
+        return conv.summary if conv else None
+
+
+def set_summary(conv_id: int, summary: str) -> None:
+    with Session(engine) as session:
+        conv = session.get(Conversation, conv_id)
+        if conv:
+            conv.summary = summary
+            session.commit()
+
+
+def delete_old_messages(conv_id: int, keep_last: int) -> None:
+    """Delete all but the most recent `keep_last` messages for a conversation."""
+    with Session(engine) as session:
+        msgs = session.exec(
+            select(Message).where(Message.conversation_id == conv_id).order_by(Message.id)
+        ).all()
+        to_delete = msgs[:-keep_last] if keep_last < len(msgs) else []
+        for m in to_delete:
+            session.delete(m)
+        session.commit()
 
 
 def append_turn(conv_id: int, user_text: str, assistant_text: str, title: Optional[str]) -> str:
